@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Final Fight Magic</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+  body {
+    background: #111; 
+    font-family: 'Press Start 2P', monospace;
+    color: #fff;
+    overflow: hidden; 
+    height: 100vh; 
+    width: 100vw;
+  }
+  
+  #game {
+    width: 100vw; height: 100vh; background: #2a2a2a;
+    position: relative; overflow: hidden; border: none;
+  }
+  
+  #bg {
+    position: absolute; inset: 0;
+    background-image: url('jj.jpg');
+    background-size: cover; 
+    background-position: center bottom;
+    image-rendering: pixelated;
+  }
+
+  /* HP и MP */
+  .bar-container { position: absolute; top: 20px; width: 35%; max-width: 600px; }
+  #hp1-cont { left: 30px; }
+  #hp2-cont { right: 30px; }
+  
+  .bar-bg {
+    width: 100%; height: 35px; background: rgba(17, 17, 17, 0.9); border: 3px solid #f1c40f; 
+    box-shadow: 0 0 10px rgba(241, 196, 15, 0.5); overflow: hidden; position: relative;
+    border-radius: 0;
+  }
+  .bar-bg.mp-bar { margin-top: 5px; height: 20px; border-color: #00ffff; box-shadow: 0 0 15px rgba(0, 255, 255, 0.6); }
+  
+  .hp-fill { 
+    height: 100%; width: 100%; 
+    background: repeating-linear-gradient(to bottom, #ff4d4d, #ff4d4d 4px, #cc0000 4px, #cc0000 8px);
+    transition: width 0.1s linear; 
+  }
+  #hp2-cont .hp-fill { 
+    float: right; 
+    background: repeating-linear-gradient(to bottom, #4da6ff, #4da6ff 4px, #005ce6 4px, #005ce6 8px);
+  }
+  
+  .mp-fill { 
+    height: 100%; width: 100%; 
+    background: repeating-linear-gradient(to bottom, #00ffff, #00ffff 4px, #0088ff 4px, #0088ff 8px);
+    transition: width 0.1s linear; 
+  }
+  #hp2-cont .mp-fill { float: right; }
+
+  .bar-text {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    font-size: 12px; color: #fff; text-shadow: 1px 1px 0 #000;
+    pointer-events: none; z-index: 5;
+  }
+  #hp1-cont .bar-text { left: 10px; }
+  #hp2-cont .bar-text { right: 10px; }
+  #hp1-cont .mp-bar .bar-text { color:#000; text-shadow:none; }
+  #hp2-cont .mp-bar .bar-text { color:#000; text-shadow:none; }
+
+  /* ИНДИКАТОР ТВОЕГО ИГРОКА */
+  .player-role-indicator {
+    position: absolute;
+    top: 80px;
+    font-size: 10px;
+    background: rgba(0,0,0,0.8);
+    padding: 6px 12px;
+    border: 2px solid #fff;
+    text-shadow: 2px 2px 0 #000;
+    z-index: 25;
+    display: none;
+  }
+  .role-p1 { left: 30px; color: #4ade80; border-color: #4ade80; box-shadow: 0 0 10px #4ade80;}
+  .role-p2 { right: 30px; color: #60a5fa; border-color: #60a5fa; box-shadow: 0 0 10px #60a5fa;}
+
+  /* Таймер по центру */
+  #top-info { 
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%); 
+    text-align: center; z-index: 20; background: rgba(0,0,0,0.8);
+    padding: 5px 15px; border: 2px solid #f1c40f; box-shadow: 0 0 10px rgba(241, 196, 15, 0.5);
+  }
+  #round-display { font-size: 10px; color: #f1c40f; margin-bottom: 5px; }
+  #timer { font-size: 30px; color: #fff; line-height: 1; }
+
+  /* СПРАЙТЫ ИГРОКОВ */
+  .fighter {
+    position: absolute; width: 48px; height: 48px;
+    transform-origin: bottom center;
+    image-rendering: pixelated; background-size: 384px 192px;
+    z-index: 10;
+  }
+  #fighter1 { left: 20%; background-image: url('p1.png'); }
+  #fighter2 { right: 20%; background-image: url('p2.png'); }
+
+  /* АНИМАЦИИ ИГРОКОВ */
+  .idle { background-position: 0px 0px; }
+  
+  @keyframes punch-anim {
+    0%   { background-position: -96px 0px; }
+    20%  { background-position: -144px 0px; }
+    40%  { background-position: -192px 0px; }
+    60%  { background-position: -240px 0px; }
+    85%  { background-position: -240px 0px; } 
+    100% { background-position: 0px 0px; }
+  }
+  .punch1 { animation: punch-anim 0.45s step-end forwards; }
+
+  .crouching { background-position: -96px -96px; }
+  
+  /* УДАР В ПРИСЕДЕ */
+  @keyframes crouch-punch-anim {
+    0%   { background-position: -96px -96px; }
+    20%  { background-position: -144px -96px; }
+    40%  { background-position: -192px -96px; }
+    60%  { background-position: -240px -96px; }
+    100% { background-position: -96px -96px; }
+  }
+  .crouch-punch { animation: crouch-punch-anim 0.2s step-end forwards; }
+
+  .hit-frame { background-position: 0px -48px; }
+  
+  @keyframes walk-anim {
+    from { background-position: 0px -144px; }
+    to { background-position: -384px -144px; }
+  }
+  .walking { animation: walk-anim 0.6s steps(8) infinite; }
+  
+  .blocking { background-position: -288px 0px; }
+  .jumping { background-position: -96px -48px; }
+  .dead { background-position: -48px -96px; }
+
+  /* ОГНЕННЫЙ ШАР */
+  .fireball {
+    position: absolute;
+    width: 60px; height: 60px;
+    background-image: url('fireball.gif');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    image-rendering: pixelated; 
+    z-index: 15; 
+  }
+
+  /* ВЗРЫВ (загрузи картинку explosion.gif) */
+  .explosion-effect {
+    position: absolute;
+    width: 300px; height: 300px;
+    background-image: url('explosion.gif');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    image-rendering: pixelated;
+    z-index: 100;
+    pointer-events: none;
+    transform: translate(-50%, 50%);
+    animation: explode 0.8s forwards;
+  }
+  
+  @keyframes explode {
+    0% { opacity: 1; transform: translate(-50%, 50%) scale(0.5); }
+    50% { opacity: 1; transform: translate(-50%, 50%) scale(1.5); }
+    100% { opacity: 0; transform: translate(-50%, 50%) scale(3); }
+  }
+
+  /* ЭФФЕКТ КРОВИ */
+  .blood-effect {
+    position: absolute;
+    width: 900px; height: 900px; 
+    background-image: url('blood.gif');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    image-rendering: pixelated;
+    z-index: 99; 
+    pointer-events: none;
+    filter: drop-shadow(0 0 30px #ff0000);
+    animation: fadeOut 0.8s forwards;
+  }
+  @keyframes fadeOut {
+    0% { opacity: 1; transform: scale(0.5); }
+    50% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.2); }
+  }
+
+  /* ТРЯСКА ЭКРАНА */
+  .shake { animation: shake 0.5s; }
+  @keyframes shake {
+    0% { transform: translate(2px, 1px) rotate(0deg); }
+    20% { transform: translate(-5px, -3px) rotate(-2deg); }
+    40% { transform: translate(-5px, 0px) rotate(2deg); }
+    60% { transform: translate(5px, 3px) rotate(0deg); }
+    80% { transform: translate(2px, -3px) rotate(2deg); }
+    100% { transform: translate(0, 0) rotate(0); }
+  }
+
+  /* UI */
+  #overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; text-align: center; }
+  #overlay h1 { font-size: 50px; color: #e63946; text-shadow: 4px 4px 0 #000; margin-bottom: 20px; }
+  .controls-list { font-size: 12px; color: #aaa; margin-bottom: 30px; line-height: 2; text-align: left; background: #222; padding: 20px; border: 2px solid #444; }
+  #status-text { font-size: 16px; margin-bottom: 20px; color: #fff; }
+  .btn { padding: 15px 40px; font-size: 18px; font-family: 'Press Start 2P', monospace; background: #f1c40f; color: #000; border: none; cursor: pointer; box-shadow: 4px 4px 0 #b38f00; }
+  .btn:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #b38f00; }
+  #restart-btn { display: none; margin-top: 20px; background: #e63946; color: #fff; box-shadow: 4px 4px 0 #8c1c26;}
+
+  #winner-screen { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 50px; color: #f1c40f; text-shadow: 4px 4px 0 #000; display: none; z-index: 50; text-align: center; line-height: 1.5;}
+</style>
+</head>
+<body>
+
+<div id="game">
+  <div id="bg"></div>
+  
+  <div class="bar-container" id="hp1-cont">
+    <div class="bar-bg">
+      <div class="bar-text">HP</div>
+      <div class="hp-fill" id="hp1-fill"></div>
+    </div>
+    <div class="bar-bg mp-bar">
+      <div class="bar-text">MP</div>
+      <div class="mp-fill" id="mp1-fill"></div>
+    </div>
+  </div>
+  
+  <div class="bar-container" id="hp2-cont">
+    <div class="bar-bg">
+      <div class="bar-text">HP</div>
+      <div class="hp-fill" id="hp2-fill"></div>
+    </div>
+    <div class="bar-bg mp-bar">
+      <div class="bar-text">MP</div>
+      <div class="mp-fill" id="mp2-fill"></div>
+    </div>
+  </div>
+
+  <div id="my-role-label" class="player-role-indicator"></div>
+
+  <div id="top-info">
+    <div id="round-display">РАУНД 1 (0 - 0)</div>
+    <div id="timer">120</div>
+  </div>
+
+  <div class="fighter" id="fighter1"></div>
+  <div class="fighter" id="fighter2"></div>
+
+  <div id="winner-screen">
+    <div id="winner-text">K.O.</div>
+    <div id="round-sub"></div>
+  </div>
+
+  <div id="overlay">
+    <h1>REAL FIGHT</h1>
+    <div class="controls-list">
+      <b>УПРАВЛЕНИЕ:</b><br>
+      Ходьба: A / D<br>
+      <b>Прыжок: ПРОБЕЛ (Space)</b><br>
+      Присед: S<br>
+      <b>Удар в стойке: ← или →</b><br>
+      <b>Удар в приседе: S + ← или S →</b><br>
+      <b style="color:#00ffff;">ОГНЕННЫЙ ШАР: S + A или S + D (Тратит 40 MP)</b><br>
+      Блок: ↓ (Стрелка вниз)
+    </div>
+    <div id="status-text">Подключение...</div>
+    <button id="ready-btn" class="btn" style="display:none;">ПРИНЯТЬ МАТЧ</button>
+    <button id="restart-btn" class="btn">ИГРАТЬ ЗАНОВО</button>
+  </div>
+</div>
+
+<script>
+let GAME_W = window.innerWidth;
+let GAME_H = window.innerHeight;
+let SCALE = 1;
+
+let GROUND_Y = 0;
+let CROUCH_Y = 0;
+let MOVE_SPEED = 0;
+let JUMP_VY = 0;
+let GRAVITY = 0;
+let REACH_LIGHT = 0;
+let CHAR_SCALE = 0;
+let FIREBALL_SCALE = 0;
+
+function updateScale() {
+    GAME_W = window.innerWidth;
+    GAME_H = window.innerHeight;
+    
+    SCALE = GAME_H / 800;
+    GROUND_Y = GAME_H * 0.18; 
+    
+    CROUCH_Y = GROUND_Y - (30 * SCALE);
+    MOVE_SPEED = 10 * SCALE; 
+    JUMP_VY = -20 * SCALE; 
+    GRAVITY = 0.9 * SCALE;
+    REACH_LIGHT = 200 * SCALE; 
+    
+    CHAR_SCALE = 7.5 * SCALE;
+    FIREBALL_SCALE = 4.5 * SCALE;
+    
+    if (myRole === 'p1') {
+        local.x = GAME_W * 0.2;
+        remote.x = GAME_W * 0.8;
+    } else if (myRole === 'p2') {
+        local.x = GAME_W * 0.8;
+        remote.x = GAME_W * 0.2;
+    }
+}
+
+window.addEventListener('resize', updateScale);
+
+const DMG_LIGHT = 10;
+const DMG_LOW = 15; 
+const DMG_FIREBALL = 25;
+const MAX_MP = 100;
+const FIREBALL_COST = 40; 
+
+let myRole = null;
+let ws = null;
+let gameRunning = false;
+let isRoundOver = false;
+
+const keys = {};
+const MAX_HP = 300;
+let fireballs = []; 
+
+const local = {
+  x: 0, y: 0, vy: 0, jumping: false, crouching: false,
+  hp: MAX_HP, mp: MAX_MP, facing: 1, anim: 'idle', dead: false,
+  lastAtk: 0, lastFireball: 0, hitTimer: 0
+};
+const remote = {
+  x: 0, y: 0, vy: 0, jumping: false, crouching: false,
+  hp: MAX_HP, mp: MAX_MP, facing: -1, anim: 'idle', dead: false,
+  hitTimer: 0
+};
+
+const el1 = document.getElementById('fighter1');
+const el2 = document.getElementById('fighter2');
+el1.dataset.anim = 'idle';
+el2.dataset.anim = 'idle';
+
+function connect() {
+  const wsUrl = `ws://${window.location.hostname}:8765`;
+  ws = new WebSocket(wsUrl);
+
+  ws.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    if (data.type === 'welcome') {
+      myRole = data.player;
+      updateScale(); 
+      
+      const roleLabel = document.getElementById('my-role-label');
+      roleLabel.style.display = 'block';
+      if (myRole === 'p1') {
+          roleLabel.textContent = "ВЫ — ИГРОК 1 (ЗЕЛЕНЫЙ)";
+          roleLabel.classList.add('role-p1');
+      } else {
+          roleLabel.textContent = "ВЫ — ИГРОК 2 (СИНИЙ)";
+          roleLabel.classList.add('role-p2');
+      }
+
+      document.getElementById('status-text').textContent = 'Ожидание противника...';
+    }
+    else if (data.type === 'both_connected') {
+      document.getElementById('status-text').textContent = 'Противник подключен!';
+      document.getElementById('ready-btn').style.display = 'block';
+    }
+    else if (data.type === 'start') {
+      startRound(data.round, data.p1Wins, data.p2Wins);
+    }
+    else if (data.type === 'time_sync') {
+      document.getElementById('timer').textContent = data.time;
+      document.getElementById('round-display').textContent = `РАУНД ${data.round} (${data.p1Wins} - ${data.p2Wins})`;
+    }
+    else if (data.type === 'round_end') {
+      endRound(data.winner);
+    }
+    else if (data.type === 'match_end') {
+      const iWon = (myRole === 'p1' && data.p1Wins >= 3) || (myRole === 'p2' && data.p2Wins >= 3);
+      
+      // ===== ТРИГГЕР ВЗРЫВА ПРИ КОНЦЕ МАТЧА =====
+      if (iWon) {
+          showExplosion(remote.x, remote.y); // Взрыв противника
+          setTimeout(() => {
+              document.getElementById(myRole === 'p1' ? 'fighter2' : 'fighter1').style.display = 'none'; // Прячем спрайт врага
+              endGame('ВЫ ПОБЕДИЛИ В МАТЧЕ!');
+          }, 400);
+      } else {
+          showExplosion(local.x, local.y); // Взрыв игрока (поражение)
+          setTimeout(() => {
+              document.getElementById(myRole === 'p1' ? 'fighter1' : 'fighter2').style.display = 'none'; // Прячем свой спрайт
+              endGame('ВЫ ПРОИГРАЛИ МАТЧ');
+          }, 400);
+      }
+    }
+    else if (data.type === 'state') {
+      remote.x = data.x; remote.y = data.y; remote.jumping = data.jumping; 
+      remote.vy = data.vy || 0; 
+      remote.hp = data.hp; remote.mp = data.mp; 
+      remote.facing = data.facing; 
+      remote.anim = data.anim; 
+      remote.crouching = data.crouching; 
+      remote.hitTimer = data.hitTimer || 0;
+      updateRemoteUI();
+    }
+    else if (data.type === 'fireball') {
+      spawnFireball(data.x, data.dir, false); 
+    }
+    else if (data.type === 'fireball_hit') {
+      takeDamage(DMG_FIREBALL, data.dir);
+    }
+    else if (data.type === 'hit') {
+      if (isRoundOver || local.dead) return;
+      let dist = Math.abs(local.x - remote.x);
+      
+      if (local.anim === 'blocking') return;
+      if (data.atkType === 'low' && local.jumping) return;
+
+      if (dist <= REACH_LIGHT) {
+        if (data.atkType === 'high' && local.crouching) return; 
+        takeDamage(data.dmg, data.dir); 
+      }
+    }
+    else if (data.type === 'opponent_left') { endGame('ПРОТИВНИК ВЫШЕЛ'); }
+  };
+}
+
+function startRound(round, p1W, p2W) {
+  updateScale(); 
+  
+  isRoundOver = false; local.hp = MAX_HP; remote.hp = MAX_HP;
+  local.mp = MAX_MP; remote.mp = MAX_MP;
+  
+  local.x = myRole === 'p1' ? GAME_W * 0.2 : GAME_W * 0.8; 
+  remote.x = myRole === 'p1' ? GAME_W * 0.8 : GAME_W * 0.2;
+  
+  local.y = 0; local.jumping = false; local.anim = 'idle'; local.crouching = false; local.dead = false; remote.dead = false;
+  remote.y = 0; remote.jumping = false;
+  local.hitTimer = 0; remote.hitTimer = 0; local.lastFireball = 0;
+  
+  if (myRole === 'p1') { local.facing = 1; remote.facing = -1; } 
+  else { local.facing = -1; remote.facing = 1; }
+  
+  // Восстанавливаем видимость спрайтов
+  el1.style.display = 'block';
+  el2.style.display = 'block';
+  
+  fireballs.forEach(f => f.el.remove());
+  fireballs = [];
+  
+  el1.dataset.anim = 'idle'; el2.dataset.anim = 'idle';
+  
+  document.getElementById('overlay').style.display = 'none';
+  document.getElementById('winner-screen').style.display = 'none';
+  document.getElementById('round-display').textContent = `РАУНД ${round} (${p1W} - ${p2W})`;
+  
+  updateLocalUI(); updateRemoteUI();
+  gameRunning = true;
+}
+
+function endRound(winner) {
+  gameRunning = false;
+  const ws = document.getElementById('winner-screen'); const wt = document.getElementById('winner-text');
+  const sub = document.getElementById('round-sub');
+  
+  wt.textContent = 'K.O.';
+  sub.textContent = winner === 'P1' ? 'ЗЕЛЕНЫЙ ПОБЕДИЛ' : 'СИНИЙ ПОБЕДИЛ';
+  
+  if (winner === 'P1' && myRole === 'p1') remote.dead = true; 
+  if (winner === 'P2' && myRole === 'p2') remote.dead = true;
+  if (winner === 'P1' && myRole === 'p2') local.dead = true; 
+  if (winner === 'P2' && myRole === 'p1') local.dead = true;
+  
+  ws.style.display = 'block';
+}
+
+function endGame(text) {
+  gameRunning = false;
+  document.getElementById('overlay').style.display = 'flex';
+  document.getElementById('status-text').textContent = text;
+  document.getElementById('ready-btn').style.display = 'none';
+  document.getElementById('restart-btn').style.display = 'block';
+  document.getElementById('winner-screen').style.display = 'none';
+}
+
+document.getElementById('ready-btn').addEventListener('click', () => {
+  document.getElementById('ready-btn').style.display = 'none';
+  document.getElementById('status-text').textContent = 'Вы готовы. Ждем противника...';
+  send({ type: 'ready' });
+});
+document.getElementById('restart-btn').addEventListener('click', () => {
+  window.location.reload();
+});
+
+function send(data) { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(data)); }
+
+function showBlood(x, y) {
+    const blood = document.createElement('div');
+    blood.className = 'blood-effect';
+    blood.style.left = (x - 400) + 'px'; 
+    blood.style.bottom = (GROUND_Y - y - 200) + 'px';
+    document.getElementById('game').appendChild(blood);
+    const game = document.getElementById('game');
+    game.classList.add('shake');
+    setTimeout(() => game.classList.remove('shake'), 300);
+    setTimeout(() => blood.remove(), 800);
+}
+
+// НОВАЯ ФУНКЦИЯ ВЗРЫВА
+function showExplosion(x, y) {
+    const explosion = document.createElement('div');
+    explosion.className = 'explosion-effect';
+    explosion.style.left = x + 'px';
+    explosion.style.bottom = (GROUND_Y - y - 150) + 'px';
+    document.getElementById('game').appendChild(explosion);
+    
+    const game = document.getElementById('game');
+    game.classList.add('shake'); // Сильная тряска
+    setTimeout(() => game.classList.remove('shake'), 500);
+    setTimeout(() => explosion.remove(), 800);
+}
+
+function takeDamage(dmg, dir) {
+  if (local.dead || !gameRunning) return;
+  local.hp = Math.max(0, local.hp - dmg);
+  updateLocalUI();
+  local.hitTimer = Date.now() + 500; 
+  showBlood(local.x, local.y);
+  if (local.hp <= 0 && !isRoundOver) {
+    isRoundOver = true;
+    gameRunning = false;
+    send({ type: 'round_win', winner: myRole === 'p1' ? 'P2' : 'P1' });
+  }
+}
+
+function updateLocalUI() { 
+  document.getElementById(myRole === 'p1' ? 'hp1-fill' : 'hp2-fill').style.width = (local.hp / MAX_HP * 100) + '%'; 
+  document.getElementById(myRole === 'p1' ? 'mp1-fill' : 'mp2-fill').style.width = (local.mp / MAX_MP * 100) + '%'; 
+}
+function updateRemoteUI() { 
+  document.getElementById(myRole === 'p1' ? 'hp2-fill' : 'hp1-fill').style.width = (remote.hp / MAX_HP * 100) + '%'; 
+  document.getElementById(myRole === 'p1' ? 'mp2-fill' : 'mp1-fill').style.width = (remote.mp / MAX_MP * 100) + '%'; 
+  if (remote.hp <= 0 && !isRoundOver && gameRunning) {
+    isRoundOver = true;
+    gameRunning = false;
+    send({ type: 'round_win', winner: myRole === 'p1' ? 'P1' : 'P2' });
+  }
+}
+
+document.addEventListener('keydown', e => { 
+    keys[e.key.toLowerCase()] = true; 
+    keys[e.key] = true; 
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault(); 
+});
+document.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; keys[e.key] = false; });
+
+function spawnFireball(startX, dir, isLocal) {
+  const fb = document.createElement('div');
+  fb.className = 'fireball';
+  if (dir === -1) fb.style.transform = `scale(-${FIREBALL_SCALE}, ${FIREBALL_SCALE})`;
+  else fb.style.transform = `scale(${FIREBALL_SCALE})`;
+  fb.style.left = startX + 'px';
+  fb.style.bottom = (GROUND_Y + (150 * SCALE)) + 'px'; 
+  document.getElementById('game').appendChild(fb);
+  fireballs.push({ el: fb, x: startX, dir: dir, isLocal: isLocal });
+}
+
+function updateFireballs() {
+  for (let i = fireballs.length - 1; i >= 0; i--) {
+    let fb = fireballs[i];
+    fb.x += fb.dir * 15 * SCALE; 
+    fb.el.style.left = fb.x + 'px';
+    if (fb.x < -200 || fb.x > GAME_W + 200) {
+      fb.el.remove();
+      fireballs.splice(i, 1);
+      continue;
+    }
+    if (fb.isLocal && gameRunning && !remote.dead) {
+      let dist = Math.abs(fb.x - remote.x);
+      if (dist < 120 * SCALE) { 
+        if (remote.anim !== 'blocking') {
+          remote.hitTimer = Date.now() + 500;
+          showBlood(remote.x, remote.y);
+        }
+        fb.el.remove();
+        fireballs.splice(i, 1);
+      }
+    }
+  }
+}
+
+function handleInput() {
+  if (!gameRunning || !myRole || local.dead) return;
+  const map = { left: 'a', right: 'd', jump: ' ', crouch: 's', atk1: 'ArrowLeft', atk2: 'ArrowRight', block: 'ArrowDown' };
+
+  let moving = false;
+  if (Date.now() > local.hitTimer) {
+    if (keys[map.left] && !local.crouching)  { local.x -= MOVE_SPEED; local.facing = -1; moving = true; }
+    if (keys[map.right] && !local.crouching) { local.x += MOVE_SPEED; local.facing = 1; moving = true; }
+  }
+  
+  if (!local.jumping && !remote.jumping) {
+      let distX = Math.abs(local.x - remote.x);
+      let minDist = 70 * SCALE; 
+      if (distX < minDist) {
+          if (local.x < remote.x) local.x = remote.x - minDist;
+          else local.x = remote.x + minDist;
+      }
+  }
+
+  const edgeOffset = 80 * SCALE;
+  local.x = Math.max(edgeOffset, Math.min(GAME_W - edgeOffset, local.x));
+  
+  local.crouching = !!keys[map.crouch];
+  if (keys[map.jump] && !local.jumping && !local.crouching && Date.now() > local.hitTimer) { 
+      local.jumping = true; local.vy = JUMP_VY;
+  }
+
+  local.mp = Math.min(MAX_MP, local.mp + 0.05);
+  updateLocalUI();
+
+  const now = Date.now();
+  const wantFireLeft = local.crouching && (keys['a'] || keys['ArrowLeft']);
+  const wantFireRight = local.crouching && (keys['d'] || keys['ArrowRight']);
+
+  if (wantFireLeft || wantFireRight) {
+    if (now - local.lastFireball > 1500 && local.mp >= FIREBALL_COST) { 
+      local.lastFireball = now; local.mp -= FIREBALL_COST; updateLocalUI();
+      local.facing = wantFireLeft ? -1 : 1; 
+      let spawnX = local.facing === 1 ? local.x + (90 * SCALE) : local.x - (90 * SCALE);
+      spawnFireball(spawnX, local.facing, true);
+      send({ type: 'fireball', x: spawnX, dir: local.facing });
+      local.anim = 'crouching';
+      return; 
+    }
+  }
+
+  if (local.anim === 'punch1' || local.anim === 'crouch-punch') return;
+
+  if (keys[map.block]) local.anim = 'blocking';
+  else if (local.jumping) local.anim = 'jumping';
+  else if (local.crouching) local.anim = 'crouching';
+  else if (moving) local.anim = 'walking';
+  else local.anim = 'idle';
+
+  if (now - (local.lastAtk || 0) > 800) {
+    // Удар в приседе
+    if (local.crouching && (keys[map.atk1] || keys[map.atk2])) {
+      if (keys[map.atk1]) local.facing = -1;
+      if (keys[map.atk2]) local.facing = 1;
+
+      local.lastAtk = now; 
+      local.anim = 'crouch-punch'; 
+      
+      send({ type: 'state', x: local.x, y: local.y, vy: local.vy, hp: local.hp, mp: local.mp, anim: local.anim, jumping: local.jumping, crouching: local.crouching, facing: local.facing, hitTimer: local.hitTimer });
+      
+      send({ type: 'hit', dmg: DMG_LOW, dir: local.facing, atkType: 'low' });
+      
+      const distHit = Math.abs(local.x - remote.x);
+      if (distHit <= REACH_LIGHT && !remote.dead && remote.anim !== 'blocking') {
+          if (!remote.jumping) {
+              showBlood(remote.x, remote.y);
+              remote.hitTimer = Date.now() + 500;
+          }
+      }
+      
+      setTimeout(() => { if(local.anim === 'crouch-punch') local.anim = 'crouching'; }, 200); 
+      return;
+    }
+
+    // Удар в стойке
+    if (!local.crouching && !local.jumping && (keys[map.atk1] || keys[map.atk2])) {
+      if (keys[map.atk1]) local.facing = -1;
+      if (keys[map.atk2]) local.facing = 1;
+
+      local.lastAtk = now; local.anim = 'punch1';
+      send({ type: 'state', x: local.x, y: local.y, vy: local.vy, hp: local.hp, mp: local.mp, anim: local.anim, jumping: local.jumping, crouching: local.crouching, facing: local.facing, hitTimer: local.hitTimer });
+      send({ type: 'hit', dmg: DMG_LIGHT, dir: local.facing, atkType: 'high' });
+      
+      const distHit = Math.abs(local.x - remote.x);
+      if (distHit <= REACH_LIGHT && !remote.dead && remote.anim !== 'blocking') {
+          showBlood(remote.x, remote.y);
+          remote.hitTimer = Date.now() + 500;
+      }
+      
+      setTimeout(() => { if(local.anim === 'punch1') local.anim = 'idle'; }, 450); 
+    }
+  }
+}
+
+function updateVisuals() {
+  if (!myRole) return;
+  
+  if (local.jumping) {
+    local.y += local.vy; local.vy += GRAVITY;
+    if (local.y >= 0) { local.y = 0; local.vy = 0; local.jumping = false; }
+  }
+
+  updateFireballs();
+
+  const el = document.getElementById(myRole === 'p1' ? 'fighter1' : 'fighter2');
+  el.style.left = local.x + 'px';
+  el.style.transform = `scale(${local.facing === -1 ? -CHAR_SCALE : CHAR_SCALE}, ${CHAR_SCALE})`;
+  
+  let lAnim = local.anim;
+  if (local.dead) {
+    lAnim = 'dead';
+    el.style.opacity = '0.6';
+    el.style.transform = `scale(${local.facing === -1 ? -CHAR_SCALE : CHAR_SCALE}, ${CHAR_SCALE}) rotate(-90deg) translateY(${40 * SCALE}px)`;
+  } else {
+    el.style.opacity = '1';
+  }
+  if (Date.now() < local.hitTimer) lAnim = 'hit-frame';
+
+  if (el.dataset.anim !== lAnim) {
+    el.dataset.anim = lAnim;
+    el.className = 'fighter ' + lAnim;
+  }
+
+  let baseBottom = GROUND_Y;
+  if (local.crouching) baseBottom = CROUCH_Y; 
+  el.style.bottom = (baseBottom - local.y) + 'px';
+
+  const elR = document.getElementById(myRole === 'p1' ? 'fighter2' : 'fighter1');
+  elR.style.left = remote.x + 'px';
+  let flipR = (remote.facing === -1); 
+  
+  elR.style.transform = `scale(${flipR ? -CHAR_SCALE : CHAR_SCALE}, ${CHAR_SCALE})`;
+
+  let rAnim = remote.anim;
+  if (remote.dead) {
+    rAnim = 'dead';
+    elR.style.opacity = '0.6';
+    elR.style.transform = `scale(${flipR ? -CHAR_SCALE : CHAR_SCALE}, ${CHAR_SCALE}) rotate(90deg) translateY(${40 * SCALE}px)`;
+  } else {
+    elR.style.opacity = '1';
+  }
+  if (Date.now() < remote.hitTimer) rAnim = 'hit-frame';
+
+  if (elR.dataset.anim !== rAnim) {
+    elR.dataset.anim = rAnim;
+    elR.className = 'fighter ' + rAnim;
+  }
+
+  let baseBottomR = GROUND_Y;
+  if (remote.crouching) baseBottomR = CROUCH_Y;
+  elR.style.bottom = (baseBottomR - remote.y) + 'px';
+}
+
+function sendState() {
+  send({ type: 'state', x: local.x, y: local.y, vy: local.vy, hp: local.hp, mp: local.mp, anim: local.anim, jumping: local.jumping, crouching: local.crouching, facing: local.facing, hitTimer: local.hitTimer });
+}
+
+function gameLoop() {
+  if (gameRunning && myRole) {
+    handleInput(); 
+    updateVisuals();
+  }
+  requestAnimationFrame(gameLoop);
+}
+
+updateScale(); 
+connect();
+gameLoop();
+setInterval(() => { if (gameRunning) sendState(); }, 50);
+</script>
+</body>
+</html>
